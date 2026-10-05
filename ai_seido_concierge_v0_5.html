@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>AI制度コンシェルジュ v0.5</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif;background:#f6f7f9;margin:0;color:#222}
+.wrap{max-width:720px;margin:auto;padding:16px}
+.card{background:#fff;border-radius:18px;padding:18px;margin:12px 0;box-shadow:0 2px 10px #0001}
+h1{font-size:22px;margin:0 0 4px}
+h2{font-size:18px;margin:0 0 10px}
+h3{font-size:17px;margin:3px 0 8px}
+.muted,.hint,.small{color:#666;font-size:13px;line-height:1.6}
+.step{font-size:12px;font-weight:bold;color:#666;margin-bottom:8px}
+label.title{font-weight:bold;display:block;margin:10px 0 6px}
+select,input[type=text]{width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;font-size:15px;background:#fff}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.choice{border:1px solid #ddd;border-radius:10px;padding:11px;font-weight:normal;display:block;background:#fff}
+.choice input{margin-right:6px}
+.choice:has(input:checked){border-color:#222;background:#f5f6f8}
+.actions{display:grid;gap:9px}
+.main-action,.reset-action{display:block;width:100%;padding:15px;border:0;border-radius:12px;font-weight:bold;font-size:16px;text-align:center;text-decoration:none;cursor:pointer}
+.main-action{background:#222;color:#fff}
+.reset-action{background:#eee;color:#222}
+.result{border:1px solid #ddd;border-radius:12px;padding:14px;margin-top:10px}
+.result .status{font-weight:bold}
+.why{background:#f5f7fa;padding:11px;border-radius:10px;font-size:13px;line-height:1.65}
+.pill{display:inline-block;background:#eef5ee;padding:5px 8px;border-radius:8px;font-size:12px}
+.warn{background:#fff7df;border:1px solid #ead9a4;padding:11px;border-radius:10px;font-size:13px;line-height:1.6}
+.good{background:#eef7ee;border:1px solid #cfe3cf;padding:11px;border-radius:10px;font-size:13px;line-height:1.6}
+.source{font-size:12px;line-height:1.6}
+.source a{color:#165db5}
+.hidden{display:none}
+.term{color:#165db5;text-decoration:underline;text-decoration-style:dotted;cursor:pointer}
+.summary{background:#f2f4f7;border-radius:12px;padding:12px;font-size:13px;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="card">
+<h1>🧭 AI制度コンシェルジュ</h1>
+<div class="muted">制度探しナビ v0.5｜まとめて入力 → 条件に応じて候補を整理</div>
+</div>
+
+<form id="guideForm" onsubmit="return false;">
+
+<div class="card">
+<div class="step">STEP 1｜地域</div>
+<label class="title">お住まいの地域</label>
+<div class="grid">
+<select id="prefecture">
+<option value="">都道府県を選択</option>
+<option>兵庫県</option><option>大阪府</option><option>京都府</option><option>その他</option>
+</select>
+<input id="city" type="text" placeholder="市区町村（例：西宮市）">
+</div>
+<div class="hint">自治体制度の検索候補を絞るために使用します。番地は入力不要です。</div>
+</div>
+
+<div class="card">
+<div class="step">STEP 2｜基本情報</div>
+<label class="title">年齢</label>
+<select id="age">
+<option value="unknown">わからない</option><option value="under70">70歳未満</option><option value="70plus">70歳以上</option>
+</select>
+
+<label class="title">健康保険</label>
+<select id="insurance">
+<option value="unknown">わからない</option><option value="company">会社員の健康保険</option><option value="national">国民健康保険</option><option value="mutual">共済</option><option value="elderly">後期高齢者医療</option>
+</select>
+</div>
+
+<div class="card">
+<div class="step">STEP 3｜今回の状況</div>
+<label class="choice"><input id="medical" type="checkbox" checked>病気・けがで治療している</label>
+<label class="choice"><input id="hospital" type="checkbox" checked>入院予定・入院中</label>
+<label class="choice"><input id="rest" type="checkbox">仕事を休んでいる・休む予定</label>
+<label class="choice"><input id="incomeDown" type="checkbox">収入が減っている</label>
+<label class="choice"><input id="living" type="checkbox">生活費・家賃が心配</label>
+
+<label class="title">仕事を続けられる状態ですか？</label>
+<select id="workAbility">
+<option value="unknown">わからない</option>
+<option value="possible">仕事は継続可能</option>
+<option value="unable">今の仕事ができない</option>
+</select>
+
+<label class="title">病気・けがの原因</label>
+<select id="cause">
+<option value="unknown">わからない</option>
+<option value="outside">業務外の病気・けが</option>
+<option value="work">業務中・通勤中の病気・けが</option>
+</select>
+</div>
+
+<div class="card">
+<div class="step">STEP 4｜医療費・所得</div>
+<label class="title">今回の自己負担予定額</label>
+<select id="selfpay">
+<option value="unknown">わからない</option>
+<option value="under1">〜1万円</option>
+<option value="1to3">1〜3万円</option>
+<option value="3to5">3〜5万円</option>
+<option value="5to10">5〜10万円</option>
+<option value="over10">10万円以上</option>
+</select>
+
+<label class="title">所得・給与</label>
+<select id="income">
+<option value="unknown">わからない</option>
+<option value="under200">〜200万円</option>
+<option value="200to370">200〜370万円</option>
+<option value="370to510">370〜510万円</option>
+<option value="510to770">510〜770万円</option>
+<option value="over770">770万円以上</option>
+</select>
+
+<label class="title">休んだ期間の給与</label>
+<select id="salary">
+<option value="unknown">わからない</option>
+<option value="none">給与なし</option>
+<option value="partial">一部支給</option>
+<option value="full">全額支給</option>
+</select>
+
+<div class="hint">
+<span class="term" onclick="openInfo()">標準報酬月額 ⓘ</span>：手取り額そのものではなく、健康保険の計算などに使われる金額です。
+</div>
+</div>
+
+<div class="card">
+<div class="step">STEP 5｜過去の利用</div>
+<label class="title">過去12か月に高額療養費に該当した月がありますか？</label>
+<div class="grid">
+<label class="choice"><input type="radio" name="past" value="yes">ある</label>
+<label class="choice"><input type="radio" name="past" value="no">ない</label>
+</div>
+<label class="choice" style="margin-top:8px"><input type="radio" name="past" value="unknown" checked>わからない</label>
+</div>
+
+<div class="card">
+<div class="hint">🔐 試作では入力内容を保存・送信しません。本番版では、個人情報・ログ・解析データの保存範囲を別途明確に設計します。</div>
+<br>
+<div class="actions">
+<button class="main-action" type="button" onclick="analyze()">制度候補をまとめて確認する</button>
+<button class="reset-action" type="button" onclick="resetGuide()">最初からやり直す</button>
+</div>
+</div>
+
+<div class="card hidden" id="results">
+<span class="pill">今回の検索結果</span>
+<div id="summary" class="summary" style="margin-top:10px"></div>
+<div id="resultList"></div>
+<div class="warn" style="margin-top:12px">
+⚠️ これは「制度を探すための候補提示」の試作です。最終的な対象可否・金額・必要書類は、加入している健康保険や自治体などの公式案内で確認します。
+</div>
+</div>
+
+</form>
+
+<div class="card">
+<div class="source"><b>試作で参照している主な公式情報</b><br>
+・<a href="https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/kenkou_iryou/iryouhoken/juuyou/kougakuiryou/index.html" target="_blank" rel="noopener">厚生労働省｜高額療養費制度</a><br>
+・<a href="https://www.kyoukaikenpo.or.jp/benefit/injury_and_sickness_allowance/" target="_blank" rel="noopener">協会けんぽ｜傷病手当金</a>
+</div>
+</div>
+</div>
+
+<div id="modal" class="hidden" style="position:fixed;inset:0;background:#0008;padding:30px 16px">
+<div style="background:#fff;border-radius:18px;padding:20px;max-width:600px;margin:10vh auto">
+<h2>「標準報酬月額」って？</h2>
+<p>健康保険料や傷病手当金などの計算に使われる金額です。<b>手取り額そのものではありません。</b></p>
+<p>分からない場合は、勤務先や加入している健康保険に確認できます。</p>
+<button class="reset-action" onclick="closeInfo()">閉じる</button>
+</div>
+</div>
+
+<script>
+function val(id){return document.getElementById(id).value;}
+function checked(id){return document.getElementById(id).checked;}
+function pastVal(){
+  const x=document.querySelector('input[name="past"]:checked');
+  return x?x.value:'unknown';
+}
+function addResult(title,status,body,cls){
+  return '<div class="result"><h3>'+title+'</h3><div class="status">'+status+'</div><div class="'+(cls||'why')+'" style="margin-top:8px">'+body+'</div></div>';
+}
+function analyze(){
+  const medical=checked('medical');
+  const rest=checked('rest');
+  const incomeDown=checked('incomeDown');
+  const living=checked('living');
+  const workAbility=val('workAbility');
+  const cause=val('cause');
+  const insurance=val('insurance');
+  const selfpay=val('selfpay');
+  const salary=val('salary');
+  const past=pastVal();
+  const city=document.getElementById('city').value.trim();
+
+  let results=[];
+  let reasons=[];
+
+  if(medical || checked('hospital')){
+    let hc='医療費の自己負担には、年齢・所得などに応じた上限があります。2026年8月からは年間上限も設けられています。今回の自己負担額だけでは対象額を確定できないため、加入先の保険者で確認する候補として表示します。';
+    if(selfpay==='5to10'||selfpay==='over10') hc+=' 自己負担が比較的大きい入力なので、優先して確認する候補です。';
+    if(past==='yes') hc+=' 過去12か月に該当月があるため、多数回該当の確認も候補になります。';
+    results.push(addResult('🏥 高額療養費','関係する可能性があります',hc,'good'));
+    reasons.push('医療費');
+  }
+
+  let sicknessStatus='今回の入力では主要候補から外します';
+  let sicknessBody='傷病手当金は、業務外の病気・けが、今の仕事ができないこと、連続3日を含む4日以上仕事を休むこと、給与の支払いがない（または少ない）ことなど、複数の条件があります。';
+  let sicknessClass='why';
+
+  if(insurance==='company' && rest && cause==='outside' && workAbility==='unable'){
+    sicknessStatus='確認優先度の高い候補です';
+    sicknessBody+=' 今回は「会社員の健康保険」「仕事を休む」「業務外」「今の仕事ができない」という入力がそろったため、追加条件を確認する候補として表示します。休業日数や給与の状況なども確認が必要です。';
+    sicknessClass='good';
+    reasons.push('収入減少への支援');
+  }else if(rest || incomeDown || workAbility==='unable'){
+    sicknessStatus='条件次第で関係する可能性があります';
+    sicknessBody+=' 今回は仕事を休む・収入減少などの入力があるため候補に残しますが、健康保険、業務内外、労務不能、休業日数、給与支払いなどの条件確認が必要です。';
+    sicknessClass='warn';
+    reasons.push('休業・収入');
+  }
+  results.push(addResult('💼 傷病手当金',sicknessStatus,sicknessBody,sicknessClass));
+
+  if(living || incomeDown){
+    results.push(addResult('🏠 生活費・家賃などの支援','追加検索の候補です','医療費とは別に、収入減少や生活費への影響に対応する制度が存在する場合があります。自治体や公的相談窓口を含めて、地域と状況を追加検索する設計にします。','warn'));
+    reasons.push('生活費');
+  }
+
+  if(city){
+    results.push(addResult('📍 自治体独自の支援','市区町村の公式情報を追加確認する候補です','入力された市区町村に応じて、医療費・福祉・生活支援などの自治体制度を検索する部分です。v0.5では候補表示までとし、本番版では公式ページを取得して確認します。','why'));
+    reasons.push('自治体');
+  }else{
+    results.push(addResult('📍 自治体独自の支援','市区町村が未入力です','自治体制度は地域によって異なるため、市区町村を入力すると検索対象を絞れます。','warn'));
+  }
+
+  document.getElementById('summary').innerHTML='<b>今回の入力から拾ったテーマ：</b> '+(reasons.length?reasons.join('・'):'入力内容から追加確認する制度を整理します。')+
+    '<br><span class="small">※「対象」と断定するのではなく、確認する価値がある制度を候補として表示しています。</span>';
+  document.getElementById('resultList').innerHTML=results.join('');
+  const r=document.getElementById('results');
+  r.classList.remove('hidden');
+  setTimeout(function(){r.scrollIntoView({behavior:'smooth',block:'start'});},50);
+}
+function resetGuide(){
+  document.getElementById('guideForm').reset();
+  document.getElementById('medical').checked=true;
+  document.getElementById('hospital').checked=true;
+  document.querySelector('input[name="past"][value="unknown"]').checked=true;
+  document.getElementById('results').classList.add('hidden');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function openInfo(){document.getElementById('modal').classList.remove('hidden')}
+function closeInfo(){document.getElementById('modal').classList.add('hidden')}
+</script>
+</body>
+</html>
